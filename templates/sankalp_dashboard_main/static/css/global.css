@@ -1,0 +1,62 @@
+/* Global Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Body */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  font-size: 16px; /* default font size */
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-dark);
+  margin-bottom: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.75rem; }
+h3 { font-size: 1.5rem; }
+h4 { font-size: 1.25rem; }
+h5 { font-size: 1rem; }
+h6 { font-size: 0.875rem; }
+
+/* Paragraphs */
+p {
+  /* margin-bottom: 1rem; */
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+/* Links */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color 0.3s;
+}
+a:hover {
+  color: var(--color-accent);
+}
+
+
+/* Utility classes */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-left { text-align: left; }
+.font-bold { font-weight: 700; }
+.font-medium { font-weight: 500; }
+.font-light { font-weight: 300; }
+
+/* Small text */
+small {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}

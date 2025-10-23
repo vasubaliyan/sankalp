@@ -1,0 +1,25 @@
+{
+  "name": "my-dashboard",
+  "version": "1.0.0",
+  "description": "A modular dashboard using HTML, CSS, JS, Chart.js",
+  "main": "src/js/app.js",
+  "scripts": {
+    "start": "live-server public",
+    "lint": "eslint src/js/**/*.js",
+    "format": "prettier --write src/js/**/*.js",
+    "build": "echo 'No build needed for plain JS'",
+    "audit": "echo 'Ignoring dev dependencies audit'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "chart.js": "^4.5.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.37.0",
+    "live-server": "^1.2.0",
+    "prettier": "^3.6.2"
+  }
+}

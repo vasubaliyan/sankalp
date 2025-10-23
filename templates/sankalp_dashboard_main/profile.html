@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+
+<!-- Security & Cache Control -->
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="Referrer-Policy" content="no-referrer-when-downgrade">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+  <!-- CSS -->
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'css/variables.css' %}">
+<link rel="stylesheet" href="{% static 'css/global.css' %}">
+<link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+
+  <!-- Favicon -->
+  <link rel="shortcut icon" href="{% static 'img/favicon.png' %}" type="image/x-icon">
+
+  <script src="{% static 'js/auth.js' %}"></script>
+
+  <title>User Profile</title>
+
+  </head>
+
+<body>
+
+      <!-- Navbar -->
+  <nav>
+    <div class="logo">Sankalp</div>
+    <ul>
+      <li><a href="">Home</a></li>
+      <li><a href="">Dashboard</a></li>
+      <li><a href="">About</a></li>
+      <li><button id="logoutBtn" class="btn-logout">Logout</button></li>
+    </ul>
+  </nav>
+
+
+  <div class="profile-card">
+    <div class="profile-avatar">U</div>
+    <h2>User Name</h2>
+    <p>Welcome back!</p>
+
+    <div class="email-box">
+      Email: <span id="userEmail">user@example.com</span>
+    </div>
+
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+
+
+
+    <script src="../src/js/navbar.js"></script>
+  <script src="../src/js/logout.js"></script>
+</body>
+</html>

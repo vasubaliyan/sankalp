@@ -1,0 +1,142 @@
+/* Make full page height */
+html, body {
+  height: 100%;
+  margin: 0;
+  
+}
+
+/* Page wrapper flex column */
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh; /* take full viewport height */
+}
+
+
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  top: 60px; 
+  width: 250px;
+  height: calc(100% - 60px);
+  background-color: var(--color-white);
+  padding: 2rem;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.sidebar ul { list-style: none; padding: 0; }
+.sidebar ul li {
+  margin-bottom: 0; /* remove existing margin */
+}
+
+.sidebar ul li a {
+  display: block;
+  padding: 0.5rem 0.5rem;
+  margin-bottom: 1rem; /* spacing between tabs */
+  color: var(--color-dark);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+
+/* Active tab highlight */
+.sidebar ul li a.active-tab {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  border-radius: 8px;
+  display: block;
+  padding: 0.5rem 0.5rem; /* same as normal state */
+  transition: 0.3s;
+}
+
+
+
+/* Main Content */
+/* Main content grows to fill space */
+.dashboard-main {
+  flex: 1;            /* fills available vertical space */
+  margin-left: 260px; /* adjust for sidebar */
+  padding: 80px 2rem 2rem 2rem;
+}
+.dashboard-main h1 { margin-bottom: 2rem; color: var(--color-dark); }
+
+/* Tables Grid */
+.tables-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+}
+
+@media (max-width: 900px) {
+  .tables-container { grid-template-columns: 1fr; }
+}
+
+.table-card {
+  background-color: var(--color-white);
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  overflow-x: auto;
+}
+
+.table-card h3 { margin-bottom: 1rem; color: var(--color-primary); }
+.table-card table { width: 100%; border-collapse: collapse; }
+.table-card table th,
+.table-card table td { padding: 0.5rem 1rem; border: 1px solid #ddd; text-align: left; }
+.table-card table th { background-color: var(--color-light); }
+
+/* Chart container */
+.charts-container {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.chart-card {
+  background-color: var(--color-white);
+  padding: 1rem;
+  border-radius: 12px;
+  flex: 1 1 400px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+
+
+.detailed-charts-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2 columns of equal width */
+  grid-auto-rows: auto;
+  gap: 2rem;
+  width: 80%; /* increase width if needed */
+  margin: 0 auto;
+}
+
+/* Make the last chart span both columns */
+.detailed-charts-container .detailed-chart-card:nth-child(3) {
+  grid-column: 1 / span 2;
+}
+
+.detailed-chart-card {
+  background-color: var(--color-white);
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.detailed-chart-card canvas {
+  width: 100% !important;
+  height: 400px;
+}
+
+
+
+/* Footer sticks to bottom */
+footer {
+  text-align: center;
+  padding: 2rem;
+  background-color: var(--color-white);
+  color: var(--color-text);
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+  flex-shrink: 0; /* prevents shrinking */
+}

@@ -1,0 +1,600 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Security & Cache Control -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="Referrer-Policy" content="no-referrer-when-downgrade">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <title>Sankalp Dashboard</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{% static 'css/variables.css' %}">
+  <link rel="stylesheet" href="{% static 'css/global.css' %}">
+  <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+  <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+
+  <link rel="shortcut icon" href="{% static 'img/favicon.png' %}" type="image/x-icon">
+
+  <!-- Chart + Auth JS -->
+  <script src="{% static 'js/libs/chart.umd.min.js' %}"></script>
+  <script src="{% static 'js/auth.js' %}"></script>
+
+  <style>
+    /* ----- Dashboard Section Styling ----- */
+
+    .section-row {
+      margin-bottom: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 10px;
+      border-left: 4px solid #007bff;
+      padding-left: 8px;
+    }
+
+    /* Two cards side by side */
+    .card-pair {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: flex-start;
+    }
+
+    .table-card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .count-card {
+      max-width: 350px;
+      text-align: center;
+    }
+
+    .dag-card {
+      flex: 2;
+    }
+
+    .count-value {
+      font-size: 36px;
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    .dag-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+
+    .dag-list li {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #eee;
+      padding: 6px 0;
+    }
+
+    .overall-total {
+      font-weight: bold;
+      margin-top: 10px;
+      text-align: right;
+      color: #333;
+    }
+
+    footer {
+      margin-top: 40px;
+      padding: 10px;
+      text-align: center;
+      background: #f8f9fa;
+      color: #555;
+      font-size: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .card-pair {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Navbar -->
+  <nav>
+    <div class="logo">Sankalp</div>
+    <ul>
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Profile</a></li>
+      <li><a href="#">About</a></li>
+      <li><button id="logoutBtn" class="btn-logout">Logout</button></li>
+    </ul>
+  </nav>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <ul>
+      <li><a href="#" data-tab="tables">Tables</a></li>
+      <li><a href="#" data-tab="charts">Charts</a></li>
+      <li><a href="#" data-tab="detailedCharts">Detailed Charts</a></li>
+    </ul>
+  </aside>
+
+  <div class="page-wrapper">
+    <main class="dashboard-main">
+
+
+      <!-- ✅ TOTAL DELIVERIES SECTION -->
+<section class="section-row">
+  <div class="section-title">Total Deliveries Summary</div>
+  <div class="card-pair">
+    <!-- Left: Total Count -->
+    <div class="table-card count-card">
+      <h3>Total Deliveries</h3>
+      <p id="totalDeliveriesCount" class="count-value" style="color:#6f42c1;">Loading...</p>
+    </div>
+
+    <!-- Right: DAG-wise -->
+    <div class="table-card dag-card">
+      <h3>Total Deliveries (Site-wise)</h3>
+      <ul id="totalDeliveriesDagList" class="dag-list"><li>Loading...</li></ul>
+      <p id="totalDeliveriesOverall" class="overall-total"></p>
+    </div>
+  </div>
+</section>
+
+      <!-- LIVE BIRTH SECTION -->
+      <section class="section-row">
+        <div class="section-title">Live Birth Summary</div>
+        <div class="card-pair">
+          <div class="table-card count-card">
+            <h3>Total Live Birth</h3>
+            <p id="babyStatusCount" class="count-value">Loading...</p>
+          </div>
+
+          <div class="table-card dag-card">
+            <h3>Live Birth (Site-wise)</h3>
+            <ul id="dagCountsList" class="dag-list"><li>Loading...</li></ul>
+            <p id="overallTotal" class="overall-total"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- STILL BORN SECTION -->
+      <section class="section-row">
+        <div class="section-title">Still Born / IUD Summary</div>
+        <div class="card-pair">
+          <div class="table-card count-card">
+            <h3>Still Born / IUD</h3>
+            <p id="babyStatus3Count" class="count-value">Loading...</p>
+          </div>
+
+          <div class="table-card dag-card">
+            <h3>Still Born / IUD (Site-wise)</h3>
+            <ul id="stillbornDagList" class="dag-list"><li>Loading...</li></ul>
+            <p id="stillbornOverall" class="overall-total"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- NEONATAL DEATH SECTION -->
+      <section class="section-row">
+        <div class="section-title">Neonatal Death Summary</div>
+        <div class="card-pair">
+          <div class="table-card count-card">
+            <h3>Total NEONATAL DEATH</h3>
+            <p id="deadOverall" class="count-value" style="color:#dc3545;">Loading...</p>
+          </div>
+
+          <div class="table-card dag-card">
+            <h3>Total NEONATAL DEATH(Site-wise)</h3>
+            <ul id="deadDagList" class="dag-list"><li>Loading...</li></ul>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ✅ CONNECTED CALLS SECTION -->
+      <section class="section-row">
+        <div class="section-title">Connected Calls Summary</div>
+        <div class="card-pair">
+          <div class="table-card dag-card">
+            <h3>Connected Calls (Site-wise)</h3>
+            <ul id="connectedDagList" class="dag-list"><li>Loading...</li></ul>
+            <p id="connectedOverall" class="overall-total"></p>
+          </div>
+          <div class="table-card count-card">
+            <h3>Total Connected Calls</h3>
+            <p id="connectedTotal" class="count-value" style="color:#28a745;">Loading...</p>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- STILLBIRTH RATE SECTION -->
+<section class="section-row">
+  <div class="section-title">Stillbirth Rate (SBR)</div>
+  <div class="card-pair">
+    <!-- Left: Overall SBR -->
+    <div class="table-card count-card">
+      <h3> Stillbirth Rate(SBR)</h3>
+      <p id="sbrOverall" class="count-value" style="color:#20c997;">Loading...</p>
+      <p style="font-size:14px;color:#666;"></p>
+    </div>
+
+    <!-- Right: DAG-wise SBR -->
+    <div class="table-card dag-card">
+      <h3>Stillbirth Rate (Site-wise)</h3>
+      <ul id="sbrDagList" class="dag-list"><li>Loading...</li></ul>
+      <p id="sbrOverallTotals" class="overall-total"></p>
+    </div>
+  </div>
+</section>
+
+<section class="section-row">
+  <div class="section-title">Neonatal Mortality Rate (NMR)</div>
+  <div class="card-pair">
+    
+    <!-- LEFT: Overall NMR -->
+    <div class="table-card count-card">
+      <h3> NMR</h3>
+      <p id="nmrOverall" class="count-value" style="color:#d63384;">Loading...</p>
+      <p style="font-size:14px;color:#666;"></p>
+    </div>
+
+    <!-- RIGHT: DAG-wise NMR -->
+    <div class="table-card dag-card">
+      <h3>NMR (Site-wise)</h3>
+      <ul id="nmrDagList" class="dag-list"><li>Loading...</li></ul>
+      <p id="nmrOverallTotals" class="overall-total"></p>
+    </div>
+
+  </div>
+
+
+  <!-- COMBINED SBR + NMR (Site-wise) -->
+<section class="section-row">
+  <div class="section-title">Combined Mortality Rate (SBR + NMR)</div>
+  <div class="card-pair">
+    
+    <!-- LEFT: Overall Combined -->
+    <div class="table-card count-card">
+      <h3>(SBR + NMR)</h3>
+      <p id="combinedOverall" class="count-value" style="color:#198754;">Loading...</p>
+      <p style="font-size:14px;color:#666;"></p>
+    </div>
+
+    <!-- RIGHT: DAG-wise Combined -->
+    <div class="table-card dag-card">
+      <h3>(SBR + NMR)(Site-wise)</h3>
+      <ul id="combinedDagList" class="dag-list"><li>Loading...</li></ul>
+      <p id="combinedOverallFooter" class="overall-total"></p>
+    </div>
+  </div>
+</section>
+
+</section>
+
+
+
+
+
+    </main>
+
+    <footer>
+      &copy; 2025 Sankalp Dashboard. All rights reserved.
+    </footer>
+  </div>
+
+  <!-- Scripts -->
+  <script src="{% static 'js/dashboard.js' %}"></script>
+  <script src="{% static 'js/logout.js' %}"></script>
+  <script src="{% static 'js/navbar.js' %}"></script>
+
+  <!-- Live Birth Count -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      fetch("/api/baby-status-count/")
+        .then(r => r.json())
+        .then(data => document.getElementById("babyStatusCount").textContent = data.total_count)
+        .catch(() => document.getElementById("babyStatusCount").textContent = "Error");
+    });
+  </script>
+
+  <!-- Live Birth DAG-wise -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      fetch("/api/live-born-dag/")
+        .then(r => r.json())
+        .then(data => {
+          const dagList = document.getElementById("dagCountsList");
+          dagList.innerHTML = "";
+          Object.entries(data.combined_counts).forEach(([dag, count]) => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span>${dag}</span><span>${count}</span>`;
+            dagList.appendChild(li);
+          });
+          document.getElementById("overallTotal").textContent = `Overall Total: ${data.overall_total}`;
+        })
+        .catch(() => {
+          document.getElementById("dagCountsList").innerHTML = "<li>Error loading DAG data</li>";
+        });
+    });
+  </script>
+
+  <!-- Still Born Count -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      fetch("/api/baby_stillborn_count_view/")
+        .then(r => r.json())
+        .then(data => document.getElementById("babyStatus3Count").textContent = data.total_count)
+        .catch(() => document.getElementById("babyStatus3Count").textContent = "Error");
+    });
+  </script>
+
+  <!-- Still Born DAG-wise -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      fetch("/api/stillborn-dag/")
+        .then(r => r.json())
+        .then(data => {
+          const list = document.getElementById("stillbornDagList");
+          list.innerHTML = "";
+          Object.entries(data.combined_counts).forEach(([dag, count]) => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span>${dag}</span><span>${count}</span>`;
+            list.appendChild(li);
+          });
+          document.getElementById("stillbornOverall").textContent = `Overall Total: ${data.overall_total}`;
+        })
+        .catch(() => document.getElementById("stillbornDagList").innerHTML = "<li>Error loading data</li>");
+    });
+  </script>
+
+  <!-- Dead Count -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      fetch("/api/count-dead-calls/")
+        .then(r => r.json())
+        .then(data => document.getElementById("deadOverall").textContent = data.total_dead)
+        .catch(() => document.getElementById("deadOverall").textContent = "Error");
+    });
+  </script>
+
+  <!-- Dead DAG-wise -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      fetch("/dead_counts/")
+        .then(r => r.json())
+        .then(data => {
+          const list = document.getElementById("deadDagList");
+          list.innerHTML = "";
+          data.dag_counts.forEach(item => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span>${item.dag}</span><span>${item.dead_count}</span>`;
+            list.appendChild(li);
+          });
+        })
+        .catch(() => document.getElementById("deadDagList").innerHTML = "<li>Error loading data</li>");
+    });
+  </script>
+
+
+
+<!-- ✅ Connected Calls -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Total Connected
+      fetch("/api/connected-calls/")
+        .then(r => r.json())
+        .then(data => document.getElementById("connectedTotal").textContent = data.total_connected)
+        .catch(() => document.getElementById("connectedTotal").textContent = "Error");
+
+      // DAG-wise Connected
+      fetch("/api/connected-calls-dag/")
+        .then(r => r.json())
+        .then(data => {
+          const dagList = document.getElementById("connectedDagList");
+          dagList.innerHTML = "";
+          data.dag_counts.forEach(item => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span>${item.dag}</span><span>${item.connected_count}</span>`;
+            dagList.appendChild(li);
+          });
+          document.getElementById("connectedOverall").textContent = `Overall Total: ${data.overall_total}`;
+        })
+        .catch(() => document.getElementById("connectedDagList").innerHTML = "<li>Error loading data</li>");
+    });
+  </script>
+
+
+<!-- ✅ TOTAL DELIVERIES (Overall + DAG-wise) -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Total count
+      fetch("/api/total-deliveries/")
+        .then(r => r.json())
+        .then(data => document.getElementById("totalDeliveriesCount").textContent = data.total_deliveries)
+        .catch(() => document.getElementById("totalDeliveriesCount").textContent = "Error");
+
+      // DAG-wise
+      fetch("/api/total-deliveries-dag/")
+        .then(r => r.json())
+        .then(data => {
+          const dagList = document.getElementById("totalDeliveriesDagList");
+          dagList.innerHTML = "";
+          data.dag_counts.forEach(item => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span>${item.dag}</span><span>${item.total_deliveries}</span>`;
+            dagList.appendChild(li);
+          });
+          document.getElementById("totalDeliveriesOverall").textContent = `Overall Total: ${data.overall_total}`;
+        })
+        .catch(() => document.getElementById("totalDeliveriesDagList").innerHTML = "<li>Error loading data</li>");
+    });
+  </script>
+
+
+
+<!-- ✅ STILLBIRTH RATE (Overall + DAG-wise) -->
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+
+    // ---- Overall SBR ----
+    fetch("/api/stillbirth-rate/")
+      .then(r => r.json())
+      .then(data => {
+        const sbr = data.stillbirth_rate_per_1000;
+        document.getElementById("sbrOverall").textContent = `${sbr}`;
+      })
+      .catch(() => {
+        document.getElementById("sbrOverall").textContent = "Error";
+      });
+
+    
+  });
+</script>
+
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  fetch("/api/stillbirth-rate-dag/")
+    .then(r => r.json())
+    .then(data => {
+      const list = document.getElementById("sbrDagList");
+      list.innerHTML = "";
+
+      data.dag_wise_sbr.forEach(item => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${item.dag}</span><span>${item.sbr_per_1000}</span>`;
+        list.appendChild(li);
+      });
+
+      // ✅ Corrected line (access nested overall object)
+      document.getElementById("sbrOverallTotals").textContent =
+        `Overall SBR: ${data.overall.overall_sbr_per_1000}`;
+    })
+    .catch(() => {
+      document.getElementById("sbrDagList").innerHTML = "<li>Error loading data</li>";
+    });
+});
+</script>
+
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  fetch("/api/neonatal-mortality-rate/")
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById("nmrOverall").textContent =
+        `${data.neonatal_mortality_rate_per_1000}`;
+    })
+    .catch(() => {
+      document.getElementById("nmrOverall").textContent = "Error";
+    });
+});
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  fetch("/api/neonatal-mortality-rate-dag/")
+    .then(r => r.json())
+    .then(data => {
+      // Update overall NMR
+      document.getElementById("nmrOverall").textContent =
+        `${data.overall.overall_nmr_per_1000}`;
+
+      // Populate DAG-wise list
+      const list = document.getElementById("nmrDagList");
+      list.innerHTML = "";
+      data.dag_wise_nmr.forEach(item => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${item.dag}</span><span>${item.nmr_per_1000}</span>`;
+        list.appendChild(li);
+      });
+
+      // Display overall totals
+      const o = data.overall;
+      document.getElementById("nmrOverallTotals").textContent =
+         `Overall NMR: ${o.overall_nmr_per_1000}`;
+    })
+    .catch(() => {
+      document.getElementById("nmrDagList").innerHTML = "<li>Error loading data</li>";
+    });
+});
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  fetch("/api/sbr-nmr-combined/")
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById("combinedSbrNmr").textContent =
+        `${data.combined_total_per_1000}`;
+    })
+    .catch(() => {
+      document.getElementById("combinedSbrNmr").textContent = "Error";
+    });
+});
+</script>
+
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  fetch("/api/sbr-nmr-combined-dag/")
+    .then(r => r.json())
+    .then(data => {
+      // ✅ Update overall combined rate
+      document.getElementById("combinedOverall").textContent =
+        `${data.overall.overall_combined_per_1000}`;
+
+      // ✅ Populate DAG-wise list
+      const list = document.getElementById("combinedDagList");
+      list.innerHTML = "";
+      data.dag_wise_combined.forEach(item => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${item.dag}</span><span>${item.combined_per_1000}</span>`;
+        list.appendChild(li);
+      });
+
+      // ✅ Show only overall combined at footer
+      document.getElementById("combinedOverallFooter").textContent =
+        `(SBR + NMR): ${data.overall.overall_combined_per_1000}`;
+    })
+    .catch(() => {
+      document.getElementById("combinedDagList").innerHTML = "<li>Error loading data</li>";
+    });
+});
+</script>
+
+
+
+
+
+
+
+
+</body>
+</html>

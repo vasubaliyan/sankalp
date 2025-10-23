@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>About Sankalp</title>
+
+  <!-- CSS -->
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'css/variables.css' %}">
+<link rel="stylesheet" href="{% static 'css/global.css' %}">
+<link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+<link rel="stylesheet" href="{% static 'css/about.css' %}">
+
+  <!-- Favicon -->
+  <link rel="shortcut icon" href="{% static 'img/favicon.png' %}" type="image/x-icon">
+
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav>
+    <div class="logo">Sankalp</div>
+    <ul>
+      <li><a href="">Home</a></li>
+      <li><a href="">Dashboard</a></li>
+      <li><a href="">About</a></li>
+      <li><a href="" class="login-btn">Login</a></li>
+    </ul>
+  </nav>
+
+  <!-- Page Header -->
+  <header class="about-header">
+    <h1>About Sankalp Dashboard</h1>
+    <p>Your modular analytics dashboard built for clean and scalable data visualization.</p>
+  </header>
+
+  <!-- About Content -->
+  <section class="about-content">
+    <div class="card">
+      <h2>Our Mission</h2>
+      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sankalp Dashboard is designed to help businesses visualize data efficiently and make data-driven decisions faster.</p>
+    </div>
+
+    <div class="card">
+      <h2>Features</h2>
+      <ul>
+        <li>Interactive charts and graphs</li>
+        <li>Customizable tables and dashboards</li>
+        <li>Secure user authentication</li>
+        <li>Responsive design for all devices</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Our Team</h2>
+      <p>Our team consists of passionate developers, designers, and data scientists committed to building intuitive and high-performance analytics tools.</p>
+    </div>
+
+    <div class="card">
+      <h2>Contact</h2>
+      <p>Email: info@sankalpdashboard.com</p>
+      <p>Phone: +91 1234567890</p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    &copy; 2025 Sankalp Dashboard. All rights reserved.
+  </footer>
+
+<!-- Navbar JS -->
+  <script src="{%static 'js/navbar.js' %}"></script>
+
+</body>
+</html>

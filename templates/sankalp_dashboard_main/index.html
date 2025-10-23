@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Security & Cache Control -->
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="Referrer-Policy" content="no-referrer-when-downgrade">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+
+<!-- TODO: Re-enable security headers after backend deployment -->
+<!-- Content Security Policy -->
+<!-- <meta http-equiv="Content-Security-Policy"
+      content="   default-src 'self';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data:;
+    font-src 'self' data:;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';"> -->
+
+  <title>Sankalp Dashboard</title>
+
+
+  <!-- CSS -->
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'css/variables.css' %}">
+<link rel="stylesheet" href="{% static 'css/global.css' %}">
+<link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+  <!-- Favicon -->
+  <link rel="shortcut icon" href="{% static 'img/favicon.png' %}" type="image/x-icon">
+
+
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav>
+    <div class="logo">Sankalp</div>
+    <ul>
+      <li><a href="#">Home</a></li>
+      <li><a href="">Dashboard</a></li>
+      <li><a href="">About</a></li>
+      <li><a href="" class="login-btn">Login</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <h1>Welcome to Sankalp Dashboard</h1>
+    <p>Modular, clean, and ready to build your analytics.</p>
+    <button id="startBtn">Get Started</button>
+  </section>
+
+  <!-- About Section -->
+  <section class="about">
+    <h2>About Sankalp</h2>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. About text will go here. You can describe the dashboard, its purpose, and features.</p>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features">
+    <h2>Features</h2>
+    <div class="feature-cards">
+      <div class="card">
+        <h3>Analytics</h3>
+        <p>Placeholder for analytics description.</p>
+      </div>
+      <div class="card">
+        <h3>Reports</h3>
+        <p>Placeholder for reports description.</p>
+      </div>
+      <div class="card">
+        <h3>Customization</h3>
+        <p>Placeholder for customization description.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section class="contact">
+    <h2>Contact</h2>
+    <p>Placeholder for contact information or form.</p>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    &copy; 2025 Sankalp Dashboard. All rights reserved.
+  </footer>
+
+  <!-- JS -->
+  <script src="{% static '/js/navbar.js' %}"></script>
+  <script src="{% static '/js/main.js' %}"></script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+/* Global Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+
+}
+
+
+
+
+
+/* Hero Section */
+.hero {
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.hero h1 {
+  color: var(--color-dark);
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  color: var(--color-secondary);
+  font-size: 1.2rem;
+  margin-bottom: 2rem;
+}
+
+.hero button {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.hero button:hover {
+  background-color: var(--color-primary-focus);
+}
+
+/* About Section */
+.about {
+  padding: 4rem 2rem;
+  background-color: var(--color-light);
+  text-align: center;
+}
+
+.about h2 {
+  color: var(--color-dark);
+  margin-bottom: 1rem;
+}
+
+.about p {
+  max-width: 700px;
+  margin: auto;
+  color: var(--color-text);
+}
+
+/* Features Section */
+.features {
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.features h2 {
+  color: var(--color-dark);
+  margin-bottom: 2rem;
+}
+
+.feature-cards {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.feature-cards .card {
+  background-color: var(--color-white);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  width: 250px;
+  transition: transform 0.3s;
+}
+
+.feature-cards .card:hover {
+  transform: translateY(-5px);
+}
+
+.feature-cards .card h3 {
+  color: var(--color-primary);
+  margin-bottom: 1rem;
+}
+
+/* Contact Section */
+.contact {
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.contact h2 {
+  color: var(--color-dark);
+  margin-bottom: 1rem;
+}
+
+.contact p {
+  max-width: 600px;
+  margin: auto;
+  color: var(--color-text);
+}
+
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 2rem;
+  background-color: var(--color-white);
+  color: var(--color-text);
+  margin-top: 4rem;
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+}

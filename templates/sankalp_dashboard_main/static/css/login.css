@@ -1,0 +1,86 @@
+/* Full page wrapper */
+.login-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: var(--color-bg);
+}
+
+/* Login card */
+.login-card {
+  background-color: var(--color-white);
+  padding: 3rem 2rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+/* Header */
+.login-header h2 {
+  margin-bottom: 0.5rem;
+  color: var(--color-primary);
+}
+
+.login-header p {
+  margin-bottom: 2rem;
+  color: var(--color-secondary);
+  font-size: 0.95rem;
+}
+
+/* Form */
+.form-group {
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--color-dark);
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--color-light);
+  border-radius: 10px;
+  font-size: 1rem;
+  outline: none;
+  transition: 0.3s;
+}
+
+.form-group input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 5px rgba(203,12,159,0.3);
+}
+
+/* Button */
+.btn-primary {
+  width: 100%;
+  padding: 0.8rem;
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  font-size: 1rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-hover); /* define hover in variables.css */
+  color:black;
+}
+
+
+
+/* Responsive */
+@media (max-width: 500px) {
+  .login-card {
+    padding: 2rem 1.5rem;
+  }
+}
