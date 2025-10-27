@@ -1,3 +1,5 @@
+
+
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils import timezone
@@ -75,10 +77,61 @@ class Project1Record(models.Model):
     d29_baby_death_place_b2_d14_d7 = models.CharField(max_length=255, null=True, blank=True)
     d29_baby_death_place_b3_d14_d7 = models.CharField(max_length=255, null=True, blank=True)
 
+    #date of death#
+    d29_baby_death_date_b1= models.CharField(max_length=255, null=True, blank=True)
+    d29_baby_death_date_b2= models.CharField(max_length=255, null=True, blank=True)
+    d29_baby_death_date_b3= models.CharField(max_length=255, null=True, blank=True)
+    #day_29 place of death
+
+    d29_baby_death_place_b1=models.CharField(max_length=255, null=True, blank=True)
+    d29_baby_death_place_b2=models.CharField(max_length=255, null=True, blank=True)
+    d29_baby_death_place_b3=models.CharField(max_length=255, null=True, blank=True)
+    q17_cause_of_death_d29_b1_1 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_2 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_3 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_4 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_5 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_6 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_7 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_8 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_9 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_10 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_1 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_2 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_3 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_4 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_5 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_6 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_7 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_8 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_9 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_10 = models.CharField(max_length=100, null=True, blank=True)
+          
+# Similarly for baby 3
+    q17_cause_of_death_d29_b3_1 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_2 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_3 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_4 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_5 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_6 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_7 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_8 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_9 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_10 = models.CharField(max_length=100, null=True, blank=True)
+
+
+    #####GA########3
+
+    estimated_date_of_delivery = models.CharField(max_length=100,null=True,blank=True,db_column="estimated_date_of_delivery_p1" ) 
+    gestation_age=models.CharField(max_length=100, null=True, blank=True)
+    ga_edd=models.CharField(max_length=100, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    
     def __str__(self):
+        
         return f"{self.record_id}"
+
 
 
 # ============================
@@ -151,13 +204,67 @@ class Project2Record(models.Model):
     d29_baby_current_status_b2=models.CharField(max_length=255, null=True, blank=True)
     d29_baby_current_status_b3=models.CharField(max_length=255, null=True, blank=True)
 
+    #date of death#
+    d29_baby_death_date_b1= models.CharField(max_length=255, null=True, blank=True)
+    d29_baby_death_date_b2= models.CharField(max_length=255, null=True, blank=True)
+    d29_baby_death_date_b3= models.CharField(max_length=255, null=True, blank=True)
+    #day_29 place of death
+
+    d29_baby_death_place_b1=models.CharField(max_length=255, null=True, blank=True)
+    d29_baby_death_place_b2=models.CharField(max_length=255, null=True, blank=True)
+    d29_baby_death_place_b3=models.CharField(max_length=255, null=True, blank=True)
+
+    q17_cause_of_death_d29_b1_1 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_2 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_3 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_4 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_5 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_6 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_7 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_8 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_9 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b1_10 = models.CharField(max_length=100, null=True, blank=True)
+    # Similarly for baby 2
+    q17_cause_of_death_d29_b2_1 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_2 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_3 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_4 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_5 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_6 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_7 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_8 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_9 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b2_10 = models.CharField(max_length=100, null=True, blank=True)  
+    # Similarly for baby 3
+    q17_cause_of_death_d29_b3_1 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_2 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_3 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_4 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_5 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_6 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_7 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_8 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_9 = models.CharField(max_length=100, null=True, blank=True)
+    q17_cause_of_death_d29_b3_10 = models.CharField(max_length=100, null=True, blank=True)
+
+
+
+
+    ######GA#############
+    gestation_age=models.CharField(max_length=100, null=True, blank=True)
+    estimated_date_of_delivery = models.CharField(max_length=100,null=True,blank=True,db_column="estimated_date_of_delivery_p2" ) 
+    q40_ga_ultrasound_20wks_weeks = models.CharField(
+        max_length=50, null=True, blank=True, db_column="q40_ga_ultrasound_20wks_weeks"
+    )
+
+
 
 
 
     updated_at = models.DateTimeField(auto_now=True)
-
     def __str__(self):
         return f"{self.record_id}"
+
 
 
 # ============================
@@ -172,6 +279,10 @@ class ProjectFetchLog(models.Model):
 
 
 
+
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.db import models
+from django.utils import timezone
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -195,18 +306,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
-
-    # ✅ Fix reverse accessor name conflict
-    groups = models.ManyToManyField(
-        'auth.Group',
-        related_name='dashboard_customuser_set',  # unique related name
-        blank=True
-    )
-    user_permissions = models.ManyToManyField(
-        'auth.Permission',
-        related_name='dashboard_customuser_set',  # unique related name
-        blank=True
-    )
 
     objects = CustomUserManager()
 

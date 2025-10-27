@@ -38,7 +38,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'Dashboard'
+    'Dashboard',
+     'channels',
 ]
 
 MIDDLEWARE = [
@@ -138,3 +139,13 @@ REDCAP_API_URL = "https://nhrp-rdp.icmr.org.in/redcap_v15.0.38/API/"
 REDCAP_API_TOKEN_PROJECT1 = "5D139489F36A6883E108BA772FBA991A"
 REDCAP_API_TOKEN_PROJECT2 = "7CD451E2003A0B8AC3B066ABAA6AAF47"
 
+AUTH_USER_MODEL = 'Dashboard.CustomUser'
+
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [("127.0.0.1", 6379)]},
+    },
+}

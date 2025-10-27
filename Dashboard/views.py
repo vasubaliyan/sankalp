@@ -12,6 +12,8 @@ from Dashboard.models import Project1Record, Project2Record
 from collections import defaultdict
 import traceback
 
+from django.http import HttpResponse
+import threading
 
 
 
@@ -69,6 +71,24 @@ def logout_user(request):
     logout(request)
     return JsonResponse({'success': True, 'message': 'Logged out successfully'})
 
+##########3handel data refrsh######
+
+# views.py
+
+
+# from Dashboard.fetch_project2 import fetch_and_save_project1
+# from Dashboard.fetch_project1 import fetch_and_save_project2
+
+
+
+# def refresh_data(request):
+#     """
+#     Background thread se Project1 + Project2 fetch karega.
+#     Frontend ko turant response dega.
+#     """
+#     threading.Thread(target=fetch_and_save_project1).start()
+#     threading.Thread(target=fetch_and_save_project2).start()
+#     return HttpResponse("✅ Fetch started! Data will update shortly.")
 
 
 ##################### Dashboard####################
@@ -1115,4 +1135,1848 @@ def sbr_nmr_combined_dag_view(request):
         print(" Error in sbr_nmr_combined_dag_view:", traceback.format_exc())
         return JsonResponse({"error": "Server error in SBR+NMR DAG view"}, status=500)
 
+
+
+#######performance dashboard#######day_29 complete############
+
+
+
+def chart_view(request):
+    return render(request, "sankalp_dashboard_main/chart.html")
+
+
+
+def count_day29_followup_combined(request):
+    """
+    Returns combined Day-29 follow-up (Connected vs Incomplete)
+    Compared against total live births.
+    """
+
+    dag = request.GET.get("dag", None)
+    LIVE_BIRTH_STATUSES = ['Live Born (Well)', 'Live Born (Sick)']
+    CONNECTED_STATUS = 'Connected'
+
+    def get_live_births(model):
+        qs = model.objects.exclude(Q(data_access_group__isnull=True) | Q(data_access_group__exact=""))
+        if dag and dag.lower() != "all":
+            qs = qs.filter(data_access_group__iexact=dag)
+        fields = ["baby1_status", "baby2_status", "baby3_status"]
+        count = sum(qs.filter(**{f"{f}__in": LIVE_BIRTH_STATUSES}).count() for f in fields)
+        return count
+
+    live_births_count = get_live_births(Project1Record) + get_live_births(Project2Record)
+
+    def get_connected_calls(model):
+        qs = model.objects.exclude(Q(data_access_group__isnull=True) | Q(data_access_group__exact=""))
+        if dag and dag.lower() != "all":
+            qs = qs.filter(data_access_group__iexact=dag)
+        fields = ["d29_call_status_b1", "d29_call_status_b2", "d29_call_status_b3"]
+        count = sum(qs.filter(**{f"{f}__iexact": CONNECTED_STATUS}).count() for f in fields)
+        return count
+
+    connected_count = get_connected_calls(Project1Record) + get_connected_calls(Project2Record)
+    not_connected = live_births_count - connected_count if live_births_count > connected_count else 0
+
+    percent_connected = round((connected_count / live_births_count * 100), 2) if live_births_count else 0
+    percent_incomplete = round(100 - percent_connected, 2)
+    coverage_vs_livebirths = percent_connected
+
+    dags1 = list(Project1Record.objects.exclude(Q(data_access_group__isnull=True) | Q(data_access_group__exact=""))
+                 .values_list("data_access_group", flat=True).distinct())
+    dags2 = list(Project2Record.objects.exclude(Q(data_access_group__isnull=True) | Q(data_access_group__exact=""))
+                 .values_list("data_access_group", flat=True).distinct())
+    all_dags = sorted(list(set(dags1 + dags2)))
+
+    return JsonResponse({
+        "live_births_total": live_births_count,
+        "day29_followup": {
+            "connected": connected_count,
+            "incomplete": not_connected,
+            "percent_connected": percent_connected,
+            "percent_incomplete": percent_incomplete,
+            "coverage_vs_livebirths_percent": coverage_vs_livebirths
+        },
+        "available_dags": all_dags,
+        "selected_dag": dag or "All"
+    })
+
+
+#######Birth weight available no of delivery#################3
+
+
+def count_birthweight_availability(request):
+    """
+    Returns DAG-wise (or total) number of deliveries 
+    (Live Born + Still Born / IUD)
+    and how many of those have birthweight available,
+    from both Project1 and Project2.
+    Merges DAGs with spelling variations (e.g., Varansi→Varanasi).
+    """
+
+    raw_dag = request.GET.get("dag", None)
+    dag = (raw_dag or "").strip().rstrip("/").lower()  # normalized input
+
+    exclude_dag_filter = Q(data_access_group__isnull=True) | Q(data_access_group__exact="")
+
+    live_statuses = ['Live Born (Well)', 'Live Born (Sick)']
+    still_status = 'Still Born / IUD'
+
+    status_fields = ['baby1_status', 'baby2_status', 'baby3_status']
+    birthweight_fields = ['baby1_birthweight', 'baby2_birthweight', 'baby3_birthweight']
+
+    # ✅ Spelling correction / DAG mapping
+    DAG_NORMALIZATION = {
+        "varansi": "varanasi",
+        "mursidabad": "murshidabad",
+        "ambala ": "ambala",  # just in case of space
+    }
+
+    def normalize_dag(value):
+        if not value:
+            return None
+        v = str(value).strip().rstrip("/").lower()
+        return DAG_NORMALIZATION.get(v, v)
+
+    def get_queryset(model):
+        qs = model.objects.exclude(exclude_dag_filter)
+        if dag and dag != "all":
+            normalized = normalize_dag(dag)
+            # filter for all variants that map to this DAG
+            dag_variants = [k for k, v in DAG_NORMALIZATION.items() if v == normalized]
+            dag_variants.append(normalized)
+            qs = qs.filter(data_access_group__in=dag_variants)
+        return qs
+
+    def count_deliveries_with_birthweight(model):
+        qs = get_queryset(model)
+        total = with_bw = 0
+
+        for record in qs.values(*status_fields, *birthweight_fields):
+            for i in range(1, 4):
+                status = record.get(f"baby{i}_status")
+                birthweight = record.get(f"baby{i}_birthweight")
+
+                if status in live_statuses + [still_status]:
+                    total += 1
+                    if birthweight and str(birthweight).strip() != "":
+                        with_bw += 1
+        return total, with_bw
+
+    # ✅ Apply to both projects
+    p1_total, p1_with_bw = count_deliveries_with_birthweight(Project1Record)
+    p2_total, p2_with_bw = count_deliveries_with_birthweight(Project2Record)
+
+    total_deliveries = p1_total + p2_total
+    total_with_birthweight = p1_with_bw + p2_with_bw
+    total_missing_birthweight = total_deliveries - total_with_birthweight
+
+    percent_with_bw = round((total_with_birthweight / total_deliveries * 100), 2) if total_deliveries else 0
+    percent_missing_bw = round(100 - percent_with_bw, 2)
+
+    # ✅ Normalize + deduplicate DAGs for dropdown
+    dags1 = [normalize_dag(x) for x in Project1Record.objects.exclude(exclude_dag_filter)
+             .values_list("data_access_group", flat=True).distinct()]
+    dags2 = [normalize_dag(x) for x in Project2Record.objects.exclude(exclude_dag_filter)
+             .values_list("data_access_group", flat=True).distinct()]
+    all_dags = sorted(list({d.capitalize() for d in dags1 + dags2 if d}))
+
+    selected_display_dag = normalize_dag(raw_dag).capitalize() if dag and dag != "all" else "All"
+
+    return JsonResponse({
+        "selected_dag": selected_display_dag,
+        "project1": {
+            "total_deliveries": p1_total,
+            "with_birthweight": p1_with_bw,
+            "missing_birthweight": p1_total - p1_with_bw,
+        },
+        "project2": {
+            "total_deliveries": p2_total,
+            "with_birthweight": p2_with_bw,
+            "missing_birthweight": p2_total - p2_with_bw,
+        },
+        "combined": {
+            "total_deliveries": total_deliveries,
+            "with_birthweight": total_with_birthweight,
+            "missing_birthweight": total_missing_birthweight,
+            "percent_with_birthweight": percent_with_bw,
+            "percent_missing_birthweight": percent_missing_bw,
+        },
+        "available_dags": all_dags
+    })
+
+
+###########delivery location place of birth available ##############
+
+
+def count_delivery_location_availability(request):
+    """
+    Returns combined (Project1 + Project2) count of delivery_location
+    availability vs missing based on TOTAL DELIVERIES (Live + Still Born / IUD),
+    baby-level matching with total deliveries (e.g. 152,805).
+    """
+
+    dag = request.GET.get("dag", None)
+
+    # Fields
+    status_fields = ["baby1_status", "baby2_status", "baby3_status"]
+    delivery_location_field = "delivery_location"
+
+    live_statuses = ['Live Born (Well)', 'Live Born (Sick)']
+    still_status = 'Still Born / IUD'
+    exclude_dag_filter = Q(data_access_group__isnull=True) | Q(data_access_group__exact="")
+
+    # DAG filter helper
+    def get_queryset(model):
+        qs = model.objects.exclude(exclude_dag_filter)
+        if dag and dag.lower() != "all":
+            qs = qs.filter(data_access_group__iexact=dag)
+        return qs
+
+    # 🧮 Baby-level counting (same as total deliveries logic)
+    def count_locations(model):
+        qs = get_queryset(model)
+        available = 0
+        missing = 0
+        total = 0
+
+        for record in qs.values(*status_fields, delivery_location_field):
+            delivery_location = record.get(delivery_location_field)
+
+            for i in range(1, 4):  # baby1, baby2, baby3
+                status = record.get(f"baby{i}_status")
+
+                # Only count valid deliveries (live/still)
+                if status in live_statuses + [still_status]:
+                    total += 1
+                    if delivery_location and str(delivery_location).strip() != "":
+                        available += 1
+                    else:
+                        missing += 1
+
+        return available, missing, total
+
+    # 🔹 Project-wise counts
+    p1_available, p1_missing, p1_total = count_locations(Project1Record)
+    p2_available, p2_missing, p2_total = count_locations(Project2Record)
+
+    # 🔹 Combine results
+    total_available = p1_available + p2_available
+    total_missing = p1_missing + p2_missing
+    total_deliveries = p1_total + p2_total  
+
+    percent_available = round((total_available / total_deliveries * 100), 2) if total_deliveries else 0
+    percent_missing = round(100 - percent_available, 2)
+
+    # 🔹 Distinct DAGs for dropdown
+    dags1 = list(Project1Record.objects.exclude(exclude_dag_filter)
+                 .values_list("data_access_group", flat=True).distinct())
+    dags2 = list(Project2Record.objects.exclude(exclude_dag_filter)
+                 .values_list("data_access_group", flat=True).distinct())
+    all_dags = sorted(list(set(dags1 + dags2)))
+
+    # 🔹 Final JSON
+    return JsonResponse({
+        "selected_dag": dag or "All",
+        "delivery_location": {
+            "available": total_available,
+            "not_available": total_missing,
+            "total": total_deliveries,
+            "percent_available": percent_available,
+            "percent_missing": percent_missing
+        },
+        "available_dags": all_dags
+    })
+
+
+
+############## neontal death have place of death ############
+
+
+def count_death_place_availability(request):
+    """
+    Return JSON with:
+    - total deaths (from both projects)
+    - how many have place of death available (any of b1/b2/b3)
+    - how many missing/not available
+    Includes both count and percentage.
+    Supports optional ?dag=<dag_name>
+    """
+
+    dag = request.GET.get("dag", None)
+    # ✅ if dag is 'All' or empty, don't apply filter
+    if not dag or dag.lower() == "all":
+        dag_filter = None
+    else:
+        dag_filter = dag.strip().lower()
+
+    project1_status_fields = [
+        "d29_baby_current_status_b1",
+        "d29_baby_current_status_b2",
+        "d29_baby_current_status_b3",
+    ]
+    project2_status_fields = project1_status_fields.copy()
+
+    place_fields = [
+        "d29_baby_death_place_b1",
+        "d29_baby_death_place_b2",
+        "d29_baby_death_place_b3",
+    ]
+
+    def process_project(model, status_fields, place_fields, dag_filter=None):
+        q = Q()
+        for f in status_fields:
+            q |= Q(**{f"{f}__icontains": "Dead"})
+
+        qs = model.objects.filter(q)
+        if dag_filter:
+            qs = qs.filter(data_access_group__iexact=dag_filter)
+
+        total_deaths = 0
+        place_available = 0
+
+        for rec in qs:
+            for i, sf in enumerate(status_fields):
+                status = getattr(rec, sf, None)
+                if status and "Dead" in status:
+                    total_deaths += 1
+                    pf = place_fields[i]
+                    val = getattr(rec, pf, None)
+                    if val and val.strip():
+                        place_available += 1
+
+        return total_deaths, place_available, total_deaths - place_available
+
+    # 🔹 Combine both projects
+    p1_total, p1_avail, p1_missing = process_project(Project1Record, project1_status_fields, place_fields, dag_filter)
+    p2_total, p2_avail, p2_missing = process_project(Project2Record, project2_status_fields, place_fields, dag_filter)
+
+    total = p1_total + p2_total
+    available = p1_avail + p2_avail
+    missing = p1_missing + p2_missing
+
+    avail_pct = round((available / total) * 100, 1) if total else 0
+    missing_pct = round((missing / total) * 100, 1) if total else 0
+
+    return JsonResponse({
+        "dag": dag if dag else "Overall",
+        "combined": {
+            "total": total,
+            "available": available,
+            "missing": missing,
+            "available_pct": avail_pct,
+            "missing_pct": missing_pct,
+        }
+    })
+
+def count_death_date_availability(request):
+    """
+    Return JSON with:
+    - total deaths (from both projects)
+    - how many have date of death available (any of b1/b2/b3)
+    - how many missing/not available
+    Optional ?dag=<dag_name>
+    """
+
+    dag = request.GET.get("dag", None)
+    # ✅ if dag is 'All' or empty, show overall data
+    if not dag or dag.lower() == "all":
+        dag_filter = None
+    else:
+        dag_filter = dag.strip().lower()
+
+    project1_status_fields = [
+        "d29_baby_current_status_b1",
+        "d29_baby_current_status_b2",
+        "d29_baby_current_status_b3",
+    ]
+    project2_status_fields = project1_status_fields.copy()
+
+    date_fields = [
+        "d29_baby_death_date_b1",
+        "d29_baby_death_date_b2",
+        "d29_baby_death_date_b3",
+    ]
+
+    def process_project(model, status_fields, date_fields, dag_filter=None):
+        q = Q()
+        for f in status_fields:
+            q |= Q(**{f"{f}__icontains": "Dead"})
+
+        qs = model.objects.filter(q)
+        if dag_filter:
+            qs = qs.filter(data_access_group__iexact=dag_filter)
+
+        total_deaths = 0
+        date_available = 0
+
+        for rec in qs:
+            for i, sf in enumerate(status_fields):
+                status = getattr(rec, sf, None)
+                if status and "Dead" in status:
+                    total_deaths += 1
+                    df = date_fields[i]
+                    val = getattr(rec, df, None)
+                    if val and val.strip():
+                        date_available += 1
+
+        return total_deaths, date_available, total_deaths - date_available
+
+    # 🔹 Combine both projects
+    p1_total, p1_avail, p1_missing = process_project(Project1Record, project1_status_fields, date_fields, dag_filter)
+    p2_total, p2_avail, p2_missing = process_project(Project2Record, project2_status_fields, date_fields, dag_filter)
+
+    total = p1_total + p2_total
+    available = p1_avail + p2_avail
+    missing = p1_missing + p2_missing
+
+    avail_pct = round((available / total) * 100, 1) if total else 0
+    missing_pct = round((missing / total) * 100, 1) if total else 0
+
+    return JsonResponse({
+        "dag": dag if dag else "Overall",
+        "combined": {
+            "total": total,
+            "available": available,
+            "missing": missing,
+            "available_pct": avail_pct,
+            "missing_pct": missing_pct,
+        }
+    })
+
+
+##########livebirth having gender########
+
+def count_livebirth_gender_availability(request):
+    """
+    Return JSON with:
+    - total live births (from both projects)
+    - how many have baby gender (sex) available
+    - how many missing/not available
+    Supports ?dag=<dag_name>
+    """
+
+    dag = request.GET.get("dag", None)
+    dag_filter = None if not dag or dag.lower() == "all" else dag.strip()
+
+    # Status fields for live births
+    live_statuses = ["Live Born (Well)", "Live Born (Sick)"]
+    status_fields = ["baby1_status", "baby2_status", "baby3_status"]
+    gender_fields = ["baby1_sex", "baby2_sex", "baby3_sex"]
+
+    def process_project(model, dag_filter=None):
+        qs = model.objects.all()
+        if dag_filter:
+            # 🔹 normalize case-insensitive match properly
+            qs = qs.filter(data_access_group__iexact=dag_filter)
+
+        total_live = 0
+        gender_available = 0
+
+        for rec in qs:
+            for i, sf in enumerate(status_fields):
+                status = getattr(rec, sf, None)
+                if status in live_statuses:
+                    total_live += 1
+                    gf = gender_fields[i]
+                    gender = getattr(rec, gf, None)
+                    if gender and gender.strip():
+                        gender_available += 1
+
+        gender_missing = total_live - gender_available
+        return total_live, gender_available, gender_missing
+
+    # 🔹 Process both projects
+    p1_total, p1_avail, p1_missing = process_project(Project1Record, dag_filter)
+    p2_total, p2_avail, p2_missing = process_project(Project2Record, dag_filter)
+
+    # 🔹 Combine results
+    total = p1_total + p2_total
+    available = p1_avail + p2_avail
+    missing = p1_missing + p2_missing
+
+    avail_pct = round((available / total) * 100, 1) if total else 0
+    missing_pct = round((missing / total) * 100, 1) if total else 0
+
+    # ✅ Add available DAGs (for dropdown)
+    dags = (
+        list(
+            Project1Record.objects.exclude(data_access_group__isnull=True)
+            .exclude(data_access_group__exact="")
+            .values_list("data_access_group", flat=True)
+            .distinct()
+        )
+        + list(
+            Project2Record.objects.exclude(data_access_group__isnull=True)
+            .exclude(data_access_group__exact="")
+            .values_list("data_access_group", flat=True)
+            .distinct()
+        )
+    )
+    dags = sorted(set(dags))
+
+    return JsonResponse({
+        "dag": dag if dag else "Overall",
+        "available_dags": dags,
+        "combined": {
+            "total": total,
+            "available": available,
+            "missing": missing,
+            "available_pct": avail_pct,
+            "missing_pct": missing_pct,
+        },
+    })
+
+import traceback
+
+def count_dead_gender_availability(request):
+    try:
+        dag = request.GET.get("dag", None)
+        dag_filter = None if not dag or dag.lower() == "all" else dag.strip().lower()
+
+        status_fields = [
+            "d29_baby_current_status_b1",
+            "d29_baby_current_status_b2",
+            "d29_baby_current_status_b3",
+        ]
+        gender_fields = [
+            "baby1_sex",
+            "baby2_sex",
+            "baby3_sex",
+        ]
+
+        def process_project(model, dag_filter=None):
+            q = Q()
+            for f in status_fields:
+                q |= Q(**{f"{f}__icontains": "Dead"})
+            qs = model.objects.filter(q)
+            if dag_filter:
+                qs = qs.filter(data_access_group__iexact=dag_filter)
+
+            total_dead = 0
+            gender_available = 0
+
+            for rec in qs:
+                for i, sf in enumerate(status_fields):
+                    status = getattr(rec, sf, None)
+                    if status and "Dead" in status:
+                        total_dead += 1
+                        gf = gender_fields[i]
+                        gender = getattr(rec, gf, None)
+                        if gender and gender.strip():
+                            gender_available += 1
+
+            gender_missing = total_dead - gender_available
+            return total_dead, gender_available, gender_missing
+
+        p1_total, p1_avail, p1_missing = process_project(Project1Record, dag_filter)
+        p2_total, p2_avail, p2_missing = process_project(Project2Record, dag_filter)
+
+        total = p1_total + p2_total
+        available = p1_avail + p2_avail
+        missing = p1_missing + p2_missing
+
+        avail_pct = round((available / total) * 100, 1) if total else 0
+        missing_pct = round((missing / total) * 100, 1) if total else 0
+
+        return JsonResponse({
+            "dag": dag if dag else "Overall",
+            "combined": {
+                "total": total,
+                "available": available,
+                "missing": missing,
+                "available_pct": avail_pct,
+                "missing_pct": missing_pct,
+            },
+        })
+
+    except Exception:
+        print("❌ Error in count_dead_gender_availability:", traceback.format_exc())
+        return JsonResponse({"error": "Internal Server Error"}, status=500)
+    
+
+
+###########causew of death###########
+
+
+
+def count_death_cause_availability(request):
+    """
+    Returns JSON:
+    - total deaths (from both projects)
+    - how many have cause of death available
+    - how many missing
+    Supports ?dag=<dag_name>
+    """
+
+    try:
+        dag = request.GET.get("dag", None)
+        dag_filter = None if not dag or dag.lower() == "all" else dag.strip().lower()
+
+        # status fields for death identification
+        status_fields = [
+            "d29_baby_current_status_b1",
+            "d29_baby_current_status_b2",
+            "d29_baby_current_status_b3",
+        ]
+
+        # cause of death checkbox fields
+        cause_fields = [
+            [f"q17_cause_of_death_d29_b1___{i}" for i in range(1, 11)],
+            [f"q17_cause_of_death_d29_b2___{i}" for i in range(1, 11)],
+            [f"q17_cause_of_death_d29_b3___{i}" for i in range(1, 11)],
+        ]
+
+        def process_project(model, dag_filter=None):
+            q = Q()
+            for f in status_fields:
+                q |= Q(**{f"{f}__icontains": "Dead"})
+            qs = model.objects.filter(q)
+            if dag_filter:
+                qs = qs.filter(data_access_group__iexact=dag_filter)
+
+            total_deaths = 0
+            cause_available = 0
+
+            for rec in qs:
+                for i, sf in enumerate(status_fields):
+                    status = getattr(rec, sf, None)
+                    if status and "Dead" in status:
+                        total_deaths += 1
+
+                        # check if any cause checkbox is filled for this baby
+                        cause_list = cause_fields[i]
+                        if any(
+                            getattr(rec, cf, None) and str(getattr(rec, cf)).strip()
+                            for cf in cause_list
+                        ):
+                            cause_available += 1
+
+            cause_missing = total_deaths - cause_available
+            return total_deaths, cause_available, cause_missing
+
+        # Process both projects
+        p1_total, p1_avail, p1_missing = process_project(Project1Record, dag_filter)
+        p2_total, p2_avail, p2_missing = process_project(Project2Record, dag_filter)
+
+        total = p1_total + p2_total
+        available = p1_avail + p2_avail
+        missing = p1_missing + p2_missing
+
+        avail_pct = round((available / total) * 100, 1) if total else 0
+        missing_pct = round((missing / total) * 100, 1) if total else 0
+
+        return JsonResponse({
+            "dag": dag if dag else "Overall",
+            "combined": {
+                "total": total,
+                "available": available,
+                "missing": missing,
+                "available_pct": avail_pct,
+                "missing_pct": missing_pct,
+            },
+        })
+
+    except Exception:
+        print("❌ Error in count_cause_of_death_availability:", traceback.format_exc())
+        return JsonResponse({"error": "Internal Server Error"}, status=500)
+    
+
+###########outcome dash#############
+ 
+# dashboard/views.py
+
+
+def outcome_dashboard(request):
+    return render(request, "sankalp_dashboard_main/outcome_dashboard.html")
+
+
+
+
+def count_delivery_location_place(request):
+    """
+    Returns count of delivery_location availability and breakdown
+    (only Public, Private, Home, On the way — excludes 'Other').
+    """
+
+    dag = request.GET.get("dag", None)
+
+    status_fields = ["baby1_status", "baby2_status", "baby3_status"]
+    delivery_location_field = "delivery_location"
+
+    live_statuses = ['Live Born (Well)', 'Live Born (Sick)']
+    still_status = 'Still Born / IUD'
+    exclude_dag_filter = Q(data_access_group__isnull=True) | Q(data_access_group__exact="")
+
+    def get_queryset(model):
+        qs = model.objects.exclude(exclude_dag_filter)
+        if dag and dag.lower() != "all":
+            qs = qs.filter(data_access_group__iexact=dag)
+        return qs
+
+    def count_locations(model):
+        qs = get_queryset(model)
+        available = 0
+        total = 0
+        breakdown = {
+            "Public health facility": 0,
+            "Private health facility": 0,
+            "Home": 0,
+            "On the way": 0
+        }
+
+        valid_places = breakdown.keys()
+
+        for record in qs.values(*status_fields, delivery_location_field):
+            delivery_location = record.get(delivery_location_field)
+
+            for i in range(1, 4):
+                status = record.get(f"baby{i}_status")
+                if status in live_statuses + [still_status]:
+                    total += 1
+                    if delivery_location and str(delivery_location).strip() != "":
+                        available += 1
+                        loc = str(delivery_location).strip()
+                        if loc in valid_places:
+                            breakdown[loc] += 1
+                        # ignore others (no "Other" count)
+        return available, total, breakdown
+
+    # 🔹 Combine both projects
+    p1_available, p1_total, p1_breakdown = count_locations(Project1Record)
+    p2_available, p2_total, p2_breakdown = count_locations(Project2Record)
+
+    total_available = p1_available + p2_available
+    total_deliveries = p1_total + p2_total  
+
+    total_breakdown = {
+        key: p1_breakdown.get(key, 0) + p2_breakdown.get(key, 0)
+        for key in set(p1_breakdown) | set(p2_breakdown)
+    }
+
+    percent_available = round((total_available / total_deliveries * 100), 2) if total_deliveries else 0
+
+    return JsonResponse({
+        "selected_dag": dag or "All",
+        "delivery_location": {
+            "available": total_available,
+            "total": total_deliveries,
+            "percent_available": percent_available,
+            "breakdown": total_breakdown
+        }
+    })
+
+
+
+#####birthweight cat########
+# 🟩 Dashboard HTML view
+def outcome_dashboard(request):
+    return render(request, "outcome_dashboard.html")
+
+def count_birthweight_category(request):
+    """
+    Returns combined (Project1 + Project2) count of available birthweights
+    categorized as:
+      <1000g, 1000–1499g, 1500–2499g, ≥2500g
+    """
+    dag = request.GET.get("dag", None)
+
+    birthweight_fields = ["baby1_birthweight", "baby2_birthweight", "baby3_birthweight"]
+    status_fields = ["baby1_status", "baby2_status", "baby3_status"]
+
+    live_statuses = ['Live Born (Well)', 'Live Born (Sick)']
+    still_status = 'Still Born / IUD'
+    exclude_dag_filter = Q(data_access_group__isnull=True) | Q(data_access_group__exact="")
+
+    def get_queryset(model):
+        qs = model.objects.exclude(exclude_dag_filter)
+        if dag and dag.lower() != "all":
+            qs = qs.filter(data_access_group__iexact=dag)
+        return qs
+
+    def count_birthweight(model):
+        qs = get_queryset(model)
+        total = available = missing = 0
+        categories = {"<1000": 0, "1000-1499": 0, "1500-2499": 0, "≥2500": 0}
+
+        for record in qs.values(*status_fields, *birthweight_fields):
+            for i in range(1, 4):
+                status = record.get(f"baby{i}_status")
+                bw = record.get(f"baby{i}_birthweight")
+
+                if status in live_statuses + [still_status]:
+                    total += 1
+                    if bw and str(bw).strip() != "":
+                        try:
+                            bw_val = float(bw)
+                            available += 1
+                            if bw_val < 1000:
+                                categories["<1000"] += 1
+                            elif 1000 <= bw_val < 1500:
+                                categories["1000-1499"] += 1
+                            elif 1500 <= bw_val < 2500:
+                                categories["1500-2499"] += 1
+                            else:
+                                categories["≥2500"] += 1
+                        except ValueError:
+                            missing += 1
+                    else:
+                        missing += 1
+        return available, missing, total, categories
+
+    # 🔹 Combine both project models
+    p1_available, p1_missing, p1_total, p1_cat = count_birthweight(Project1Record)
+    p2_available, p2_missing, p2_total, p2_cat = count_birthweight(Project2Record)
+
+    total_available = p1_available + p2_available
+    total_missing = p1_missing + p2_missing
+    total_deliveries = p1_total + p2_total
+
+    combined = {k: p1_cat.get(k, 0) + p2_cat.get(k, 0) for k in p1_cat}
+    percent_available = round((total_available / total_deliveries * 100), 2) if total_deliveries else 0
+    percent_missing = round(100 - percent_available, 2)
+
+    return JsonResponse({
+        "birthweight": {
+            "available": total_available,
+            "not_available": total_missing,
+            "total": total_deliveries,
+            "percent_available": percent_available,
+            "percent_missing": percent_missing,
+            "categories": combined
+        }
+    })
+
+
+#####3neontal death by birthcategory
+
+
+
+def count_birthweight_category_for_dead_calls(request):
+    """
+    Returns combined (Project1 + Project2) count of babies whose
+    d29_baby_current_status_bX contains 'Dead', categorized by birthweight:
+      <1000, 1000–1499, 1500–2499, ≥2500
+    """
+
+    dag = request.GET.get("dag", None)
+
+    # ✅ Death fields (status fields from D29 form)
+    project1_fields = [
+        "d29_baby_current_status_b1",
+        "d29_baby_current_status_b2",
+        "d29_baby_current_status_b3",
+    ]
+    project2_fields = [
+        "d29_baby_current_status_b1",
+        "d29_baby_current_status_b2",
+        "d29_baby_current_status_b3",
+    ]
+
+    # ✅ Birthweight fields (same across both)
+    birthweight_fields = [
+        "baby1_birthweight",
+        "baby2_birthweight",
+        "baby3_birthweight",
+    ]
+
+    exclude_dag_filter = Q(data_access_group__isnull=True) | Q(data_access_group__exact="")
+
+    # Helper: Apply DAG filter
+    def get_queryset(model):
+        qs = model.objects.exclude(exclude_dag_filter)
+        if dag and dag.lower() != "all":
+            qs = qs.filter(data_access_group__iexact=dag)
+        return qs
+
+    # 🧮 Core counting logic
+    def count_dead_birthweights(model, status_fields):
+        qs = get_queryset(model)
+
+        total_dead = 0
+        available = 0
+
+        categories = {
+            "<1000": 0,
+            "1000-1499": 0,
+            "1500-2499": 0,
+            "≥2500": 0
+        }
+
+        for record in qs.values(*status_fields, *birthweight_fields):
+            for i in range(1, 4):
+                status = str(record.get(f"d29_baby_current_status_b{i}") or "").strip()
+                bw = record.get(f"baby{i}_birthweight")
+
+                # ✅ Only "Dead" babies
+                if "dead" in status.lower():
+                    total_dead += 1
+                    if bw and str(bw).strip() != "":
+                        try:
+                            bw_val = float(bw)
+                            available += 1
+                            if bw_val < 1000:
+                                categories["<1000"] += 1
+                            elif 1000 <= bw_val < 1500:
+                                categories["1000-1499"] += 1
+                            elif 1500 <= bw_val < 2500:
+                                categories["1500-2499"] += 1
+                            else:
+                                categories["≥2500"] += 1
+                        except ValueError:
+                            pass
+
+        return total_dead, available, categories
+
+    # 🔹 Project-wise counts
+    p1_dead, p1_avail, p1_cats = count_dead_birthweights(Project1Record, project1_fields)
+    p2_dead, p2_avail, p2_cats = count_dead_birthweights(Project2Record, project2_fields)
+
+    # 🔹 Combine totals
+    total_dead = p1_dead + p2_dead
+    total_available = p1_avail + p2_avail
+    combined_cats = {
+        key: p1_cats.get(key, 0) + p2_cats.get(key, 0)
+        for key in set(p1_cats) | set(p2_cats)
+    }
+
+    percent_available = round((total_available / total_dead * 100), 2) if total_dead else 0
+
+    return JsonResponse({
+        "selected_dag": dag or "All",
+        "birthweight_deaths": {
+            "total_dead": total_dead,
+            "available_birthweight": total_available,
+            "percent_available": percent_available,
+            "categories": combined_cats
+        }
+    })
+
+#####place of death category
+
+def count_place_of_death_for_dead_calls(request):
+    """
+    Returns combined (Project1 + Project2) count of babies with status == 'Dead',
+    categorized by place of death:
+      'Public health facility', 'Private health facility', 'Home', 'On the way'
+    """
+
+    dag = request.GET.get("dag", None)
+
+    # ✅ Status fields
+    status_fields = [
+        "d29_baby_current_status_b1",
+        "d29_baby_current_status_b2",
+        "d29_baby_current_status_b3",
+    ]
+
+    # ✅ Place of death fields
+    place_fields = [
+        "d29_baby_death_place_b1_d14_d7",
+        "d29_baby_death_place_b2_d14_d7",
+        "d29_baby_death_place_b3_d14_d7",
+    ]
+
+    exclude_dag_filter = Q(data_access_group__isnull=True) | Q(data_access_group__exact="")
+
+    def get_queryset(model):
+        qs = model.objects.exclude(exclude_dag_filter)
+        if dag and dag.lower() != "all":
+            qs = qs.filter(data_access_group__iexact=dag)
+        return qs
+
+    # 🧮 Count logic
+    def count_places(model):
+        qs = get_queryset(model)
+
+        total_dead = 0
+        available = 0
+        breakdown = {
+            "Public health facility": 0,
+            "Private health facility": 0,
+            "Home": 0,
+            "On the way": 0,
+            "Other / Missing": 0
+        }
+
+        for record in qs.values(*status_fields, *place_fields):
+            for i in range(1, 4):
+                status = str(record.get(f"d29_baby_current_status_b{i}") or "").strip()
+                place = str(record.get(f"d29_baby_death_place_b{i}_d14_d7") or "").strip()
+
+                # ✅ Check only dead babies
+                if "dead" in status.lower():
+                    total_dead += 1
+                    if place and place.lower() not in ["", "unknown", "nan"]:
+                        available += 1
+                        if place in breakdown:
+                            breakdown[place] += 1
+                        else:
+                            breakdown["Other / Missing"] += 1
+                    else:
+                        breakdown["Other / Missing"] += 1
+
+        return total_dead, available, breakdown
+
+    # 🔹 Project-wise
+    p1_total, p1_available, p1_breakdown = count_places(Project1Record)
+    p2_total, p2_available, p2_breakdown = count_places(Project2Record)
+
+    # 🔹 Combine totals
+    total_dead = p1_total + p2_total
+    total_available = p1_available + p2_available
+
+    combined_breakdown = {
+        key: p1_breakdown.get(key, 0) + p2_breakdown.get(key, 0)
+        for key in set(p1_breakdown) | set(p2_breakdown)
+    }
+
+    percent_available = round((total_available / total_dead * 100), 2) if total_dead else 0
+
+    # 🔹 DAG list
+    dags1 = list(Project1Record.objects.exclude(exclude_dag_filter)
+                 .values_list("data_access_group", flat=True).distinct())
+    dags2 = list(Project2Record.objects.exclude(exclude_dag_filter)
+                 .values_list("data_access_group", flat=True).distinct())
+    all_dags = sorted(list(set(dags1 + dags2)))
+
+    # 🔹 JSON Response
+    return JsonResponse({
+        "selected_dag": dag or "All",
+        "place_of_death": {
+            "total_dead": total_dead,
+            "available": total_available,
+            "percent_available": percent_available,
+            "breakdown": combined_breakdown
+        },
+        "available_dags": all_dags
+    })
+
+#####death with gender category
+
+
+def count_dead_gender_availabilitys(request):
+    """
+    Returns (Project1 + Project2) count of babies where any d29_baby_current_status_bX contains 'Dead',
+    along with availability of gender and breakdown by gender category:
+      'Male', 'Female', 'Ambiguous', 'Unknown'
+    """
+
+    try:
+        dag = request.GET.get("dag", None)
+        dag_filter = None if not dag or dag.lower() == "all" else dag.strip().lower()
+
+        # ✅ Status & Gender fields
+        status_fields = [
+            "d29_baby_current_status_b1",
+            "d29_baby_current_status_b2",
+            "d29_baby_current_status_b3",
+        ]
+        gender_fields = [
+            "baby1_sex",
+            "baby2_sex",
+            "baby3_sex",
+        ]
+
+        #  Process per project
+        def process_project(model, dag_filter=None):
+            q = Q()
+            for f in status_fields:
+                q |= Q(**{f"{f}__icontains": "Dead"})
+            qs = model.objects.filter(q)
+            if dag_filter:
+                qs = qs.filter(data_access_group__iexact=dag_filter)
+
+            total_dead = 0
+            gender_available = 0
+            gender_missing = 0
+
+            breakdown = {
+                "Male": 0,
+                "Female": 0,
+                "Ambiguous": 0,
+                "Unknown": 0
+            }
+
+            for rec in qs:
+                for i in range(3):
+                    status = getattr(rec, status_fields[i], None)
+                    if status and "dead" in status.lower():
+                        total_dead += 1
+                        gender = getattr(rec, gender_fields[i], None)
+                        if gender and gender.strip():
+                            gender_available += 1
+                            g = gender.strip().title()  # Normalize casing
+                            if g in breakdown:
+                                breakdown[g] += 1
+                            else:
+                                breakdown["Unknown"] += 1
+                        else:
+                            gender_missing += 1
+
+            return total_dead, gender_available, gender_missing, breakdown
+
+        # 🔹 Combine Project1 + Project2
+        p1_total, p1_avail, p1_missing, p1_breakdown = process_project(Project1Record, dag_filter)
+        p2_total, p2_avail, p2_missing, p2_breakdown = process_project(Project2Record, dag_filter)
+
+        total = p1_total + p2_total
+        available = p1_avail + p2_avail
+        missing = p1_missing + p2_missing
+
+        combined_breakdown = {
+            key: p1_breakdown.get(key, 0) + p2_breakdown.get(key, 0)
+            for key in set(p1_breakdown) | set(p2_breakdown)
+        }
+
+        avail_pct = round((available / total) * 100, 1) if total else 0
+        missing_pct = round((missing / total) * 100, 1) if total else 0
+
+        return JsonResponse({
+            "dag": dag if dag else "Overall",
+            "combined": {
+                "total": total,
+                "available": available,
+                "missing": missing,
+                "available_pct": avail_pct,
+                "missing_pct": missing_pct,
+                "breakdown": combined_breakdown
+            },
+        })
+
+    except Exception:
+        print("❌ Error in count_dead_gender_availability:", traceback.format_exc())
+        return JsonResponse({"error": "Internal Server Error"}, status=500)
+
+
+#########livebirth gender distr
+
+
+
+
+def count_livebirth_gender_availabilityes(request):
+    """
+    Returns (Project1 + Project2) count of live births
+    with gender availability and breakdown by:
+      'Male', 'Female', 'Ambiguous', 'Unknown'
+    Supports ?dag=<dag_name>
+    """
+
+    dag = request.GET.get("dag", None)
+    dag_filter = None if not dag or dag.lower() == "all" else dag.strip()
+
+    # ✅ Statuses considered "Live Birth"
+    live_statuses = ["Live Born (Well)", "Live Born (Sick)"]
+
+    # ✅ Fields
+    status_fields = ["baby1_status", "baby2_status", "baby3_status"]
+    gender_fields = ["baby1_sex", "baby2_sex", "baby3_sex"]
+
+    # 🧮 Per project processor
+    def process_project(model, dag_filter=None):
+        qs = model.objects.all()
+        if dag_filter:
+            qs = qs.filter(data_access_group__iexact=dag_filter)
+
+        total_live = 0
+        gender_available = 0
+        gender_missing = 0
+
+        breakdown = {
+            "Male": 0,
+            "Female": 0,
+            "Ambiguous": 0,
+            "Unknown": 0
+        }
+
+        for rec in qs:
+            for i in range(3):
+                status = getattr(rec, status_fields[i], None)
+                if status in live_statuses:
+                    total_live += 1
+                    gender = getattr(rec, gender_fields[i], None)
+                    if gender and gender.strip():
+                        gender_available += 1
+                        g = gender.strip().title()  # Normalize casing
+                        if g in breakdown:
+                            breakdown[g] += 1
+                        else:
+                            breakdown["Unknown"] += 1
+                    else:
+                        gender_missing += 1
+
+        return total_live, gender_available, gender_missing, breakdown
+
+    # 🔹 Project-wise counts
+    p1_total, p1_avail, p1_missing, p1_breakdown = process_project(Project1Record, dag_filter)
+    p2_total, p2_avail, p2_missing, p2_breakdown = process_project(Project2Record, dag_filter)
+
+    # 🔹 Combine totals
+    total = p1_total + p2_total
+    available = p1_avail + p2_avail
+    missing = p1_missing + p2_missing
+
+    combined_breakdown = {
+        key: p1_breakdown.get(key, 0) + p2_breakdown.get(key, 0)
+        for key in set(p1_breakdown) | set(p2_breakdown)
+    }
+
+    avail_pct = round((available / total) * 100, 1) if total else 0
+    missing_pct = round((missing / total) * 100, 1) if total else 0
+
+    # 🔹 Distinct DAGs (for dropdown)
+    dags = (
+        list(
+            Project1Record.objects.exclude(data_access_group__isnull=True)
+            .exclude(data_access_group__exact="")
+            .values_list("data_access_group", flat=True)
+            .distinct()
+        )
+        + list(
+            Project2Record.objects.exclude(data_access_group__isnull=True)
+            .exclude(data_access_group__exact="")
+            .values_list("data_access_group", flat=True)
+            .distinct()
+        )
+    )
+    dags = sorted(set(dags))
+
+    # 🔹 Final JSON
+    return JsonResponse({
+        "dag": dag if dag else "Overall",
+        "available_dags": dags,
+        "combined": {
+            "total": total,
+            "available": available,
+            "missing": missing,
+            "available_pct": avail_pct,
+            "missing_pct": missing_pct,
+            "breakdown": combined_breakdown
+        },
+    })
+
+
+##########GA available###########
+
+
+
+def count_total_deliveriess(request):
+    """
+    Returns total deliveries (Live + Still/IUD)
+    and how many have gestational age info (available + not available).
+    Works even if data_access_group not present.
+    """
+
+    dag = request.GET.get("dag", "").strip()
+
+    # 🔹 check if each model actually has data_access_group
+    p1_fields = [f.name for f in Project1Record._meta.get_fields()]
+    p2_fields = [f.name for f in Project2Record._meta.get_fields()]
+
+    valid_filter_p1 = Q()
+    valid_filter_p2 = Q()
+
+    if "data_access_group" in p1_fields:
+        valid_filter_p1 &= ~Q(data_access_group__isnull=True) & ~Q(data_access_group__exact="")
+        if dag and dag.lower() != "all":
+            valid_filter_p1 &= Q(data_access_group__iexact=dag)
+
+    if "data_access_group" in p2_fields:
+        valid_filter_p2 &= ~Q(data_access_group__isnull=True) & ~Q(data_access_group__exact="")
+        if dag and dag.lower() != "all":
+            valid_filter_p2 &= Q(data_access_group__iexact=dag)
+
+    # 🔹 delivery status logic
+    live_statuses = ["Live Born (Well)", "Live Born (Sick)"]
+    still_status = "Still Born / IUD"
+    status_fields = ["baby1_status", "baby2_status", "baby3_status"]
+
+    def count_live(qs):
+        return sum(qs.filter(**{f"{f}__in": live_statuses}).count() for f in status_fields)
+
+    def count_still(qs):
+        return sum(qs.filter(**{f"{f}__exact": still_status}).count() for f in status_fields)
+
+    # 🔹 apply filters safely
+    p1 = Project1Record.objects.filter(valid_filter_p1)
+    p2 = Project2Record.objects.filter(valid_filter_p2)
+
+    total_live = count_live(p1) + count_live(p2)
+    total_still = count_still(p1) + count_still(p2)
+    total_deliveries = total_live + total_still
+
+    # 🔹 gestational age fields
+    ga_fields = [
+        "gestation_age",
+        "estimated_date_of_delivery",
+        "q40_if_available_estimated_ga_through_ultrasound_before_20_weeks_in_weeks",
+    ]
+
+    def count_ga_records(qs):
+        cond = Q()
+        for f in ga_fields:
+            if f in [fld.name for fld in qs.model._meta.get_fields()]:
+                cond |= (~Q(**{f"{f}__isnull": True}) & ~Q(**{f"{f}__exact": ""}))
+        return qs.filter(cond).distinct().count()
+
+    ga_available = count_ga_records(p1) + count_ga_records(p2)
+    ga_not_available = total_deliveries - ga_available if total_deliveries else 0
+
+    percent_available = round((ga_available / total_deliveries * 100), 2) if total_deliveries else 0
+    percent_missing = 100 - percent_available if total_deliveries else 0
+
+    return JsonResponse(
+        {
+            "selected_dag": dag if dag else "All",
+            "total_deliveries": total_deliveries,
+            "gestational_age_available": ga_available,
+            "gestational_age_not_available": ga_not_available,
+        }
+    )
+
+
+#########GA age category#######
+
+
+def ga_count_total_deliveriess(request):
+    """
+    Returns total deliveries (Live + Still/IUD),
+    GA available/not available,
+    and GA distribution by category (<28, 28–31, 32–33, 34–36, >=37).
+    """
+
+    dag = request.GET.get("dag", "").strip()
+
+    # 🔹 check if each model actually has data_access_group
+    p1_fields = [f.name for f in Project1Record._meta.get_fields()]
+    p2_fields = [f.name for f in Project2Record._meta.get_fields()]
+
+    valid_filter_p1 = Q()
+    valid_filter_p2 = Q()
+
+    if "data_access_group" in p1_fields:
+        valid_filter_p1 &= ~Q(data_access_group__isnull=True) & ~Q(data_access_group__exact="")
+        if dag and dag.lower() != "all":
+            valid_filter_p1 &= Q(data_access_group__iexact=dag)
+
+    if "data_access_group" in p2_fields:
+        valid_filter_p2 &= ~Q(data_access_group__isnull=True) & ~Q(data_access_group__exact="")
+        if dag and dag.lower() != "all":
+            valid_filter_p2 &= Q(data_access_group__iexact=dag)
+
+    # 🔹 delivery status logic
+    live_statuses = ["Live Born (Well)", "Live Born (Sick)"]
+    still_status = "Still Born / IUD"
+    status_fields = ["baby1_status", "baby2_status", "baby3_status"]
+
+    def count_live(qs):
+        return sum(qs.filter(**{f"{f}__in": live_statuses}).count() for f in status_fields)
+
+    def count_still(qs):
+        return sum(qs.filter(**{f"{f}__exact": still_status}).count() for f in status_fields)
+
+    # 🔹 apply filters safely
+    p1 = Project1Record.objects.filter(valid_filter_p1)
+    p2 = Project2Record.objects.filter(valid_filter_p2)
+
+    total_live = count_live(p1) + count_live(p2)
+    total_still = count_still(p1) + count_still(p2)
+    total_deliveries = total_live + total_still
+
+    # 🔹 GA fields (any one means available)
+    ga_fields = [
+        "gestation_age",
+        "estimated_date_of_delivery",
+        "q40_if_available_estimated_ga_through_ultrasound_before_20_weeks_in_weeks",
+    ]
+
+    def count_ga_records(qs):
+        cond = Q()
+        for f in ga_fields:
+            if f in [fld.name for fld in qs.model._meta.get_fields()]:
+                cond |= (~Q(**{f"{f}__isnull": True}) & ~Q(**{f"{f}__exact": ""}))
+        return qs.filter(cond).distinct()
+
+    ga_qs = list(count_ga_records(p1)) + list(count_ga_records(p2))
+    ga_available = len(ga_qs)
+    ga_not_available = total_deliveries - ga_available if total_deliveries else 0
+
+    # 🔹 Categorize GA available values
+    categories = {"<28": 0, "28-31": 0, "32-33": 0, "34-36": 0, ">=37": 0}
+
+    for record in ga_qs:
+        # handle numeric GA values safely
+        ga_val = None
+        for field in ga_fields:
+            val = getattr(record, field, None)
+            if val and str(val).strip().replace(".", "", 1).isdigit():
+                ga_val = float(val)
+                break
+
+        if ga_val is not None:
+            if ga_val < 28:
+                categories["<28"] += 1
+            elif 28 <= ga_val <= 31:
+                categories["28-31"] += 1
+            elif 32 <= ga_val <= 33:
+                categories["32-33"] += 1
+            elif 34 <= ga_val <= 36:
+                categories["34-36"] += 1
+            elif ga_val >= 37:
+                categories[">=37"] += 1
+
+    return JsonResponse(
+        {
+            "selected_dag": dag if dag else "All",
+            "total_deliveries": total_deliveries,
+            "gestational_age_available": ga_available,
+            "gestational_age_not_available": ga_not_available,
+            "ga_categories": categories,
+        }
+    )
+
+
+###########analytic dash##########
+    
+
+def count_place_vs_delivery_combined(request):
+    """
+    Returns combined (Project1 + Project2) comparison of:
+      - Place of Death (only for dead babies)
+      - Place of Delivery (only for delivered babies)
+    Categorized by:
+      'Public health facility', 'Private health facility', 'Home', 'On the way'
+    """
+
+    dag = request.GET.get("dag", None)
+
+    # Common DAG exclusion
+    exclude_dag_filter = Q(data_access_group__isnull=True) | Q(data_access_group__exact="")
+
+    # --- FIELD DEFINITIONS ---
+    death_status_fields = [
+        "d29_baby_current_status_b1",
+        "d29_baby_current_status_b2",
+        "d29_baby_current_status_b3",
+    ]
+    death_place_fields = [
+        "d29_baby_death_place_b1_d14_d7",
+        "d29_baby_death_place_b2_d14_d7",
+        "d29_baby_death_place_b3_d14_d7",
+    ]
+    delivery_status_fields = ["baby1_status", "baby2_status", "baby3_status"]
+    delivery_location_field = "delivery_location"
+
+    live_statuses = ['Live Born (Well)', 'Live Born (Sick)']
+    still_status = 'Still Born / IUD'
+
+    valid_places = [
+        "Public health facility",
+        "Private health facility",
+        "Home",
+        "On the way",
+    ]
+
+    # Common queryset getter
+    def get_queryset(model):
+        qs = model.objects.exclude(exclude_dag_filter)
+        if dag and dag.lower() != "all":
+            qs = qs.filter(data_access_group__iexact=dag)
+        return qs
+
+    # ---- PLACE OF DEATH COUNT ----
+    def count_places(model):
+        qs = get_queryset(model)
+        total_dead = 0
+        available = 0
+        breakdown = {place: 0 for place in valid_places}
+        breakdown["Other / Missing"] = 0
+
+        for record in qs.values(*death_status_fields, *death_place_fields):
+            for i in range(1, 4):
+                status = str(record.get(f"d29_baby_current_status_b{i}") or "").strip()
+                place = str(record.get(f"d29_baby_death_place_b{i}_d14_d7") or "").strip()
+
+                if "dead" in status.lower():
+                    total_dead += 1
+                    if place and place.lower() not in ["", "unknown", "nan"]:
+                        available += 1
+                        if place in breakdown:
+                            breakdown[place] += 1
+                        else:
+                            breakdown["Other / Missing"] += 1
+                    else:
+                        breakdown["Other / Missing"] += 1
+        return total_dead, available, breakdown
+
+    # ---- DELIVERY PLACE COUNT ----
+    def count_deliveries(model):
+        qs = get_queryset(model)
+        available = 0
+        total = 0
+        breakdown = {place: 0 for place in valid_places}
+
+        for record in qs.values(*delivery_status_fields, delivery_location_field):
+            delivery_location = str(record.get(delivery_location_field) or "").strip()
+            for i in range(1, 4):
+                status = record.get(f"baby{i}_status")
+                if status in live_statuses + [still_status]:
+                    total += 1
+                    if delivery_location:
+                        available += 1
+                        if delivery_location in breakdown:
+                            breakdown[delivery_location] += 1
+        return available, total, breakdown
+
+    # ---- PROJECT COMBINATION ----
+    p1_total_dead, p1_avail_dead, p1_death_break = count_places(Project1Record)
+    p2_total_dead, p2_avail_dead, p2_death_break = count_places(Project2Record)
+    p1_avail_del, p1_total_del, p1_del_break = count_deliveries(Project1Record)
+    p2_avail_del, p2_total_del, p2_del_break = count_deliveries(Project2Record)
+
+    # Combine both projects
+    total_dead = p1_total_dead + p2_total_dead
+    avail_dead = p1_avail_dead + p2_avail_dead
+    total_deliveries = p1_total_del + p2_total_del
+    avail_deliveries = p1_avail_del + p2_avail_del
+
+    death_breakdown = {
+        key: p1_death_break.get(key, 0) + p2_death_break.get(key, 0)
+        for key in set(p1_death_break) | set(p2_death_break)
+    }
+    delivery_breakdown = {
+        key: p1_del_break.get(key, 0) + p2_del_break.get(key, 0)
+        for key in set(p1_del_break) | set(p2_del_break)
+    }
+
+    # Percentages
+    percent_death_avail = round((avail_dead / total_dead * 100), 2) if total_dead else 0
+    percent_del_avail = round((avail_deliveries / total_deliveries * 100), 2) if total_deliveries else 0
+
+    return JsonResponse({
+        "selected_dag": dag or "All",
+        "place_of_death": {
+            "total_dead": total_dead,
+            "available": avail_dead,
+            "percent_available": percent_death_avail,
+            "breakdown": death_breakdown
+        },
+        "place_of_delivery": {
+            "total_deliveries": total_deliveries,
+            "available": avail_deliveries,
+            "percent_available": percent_del_avail,
+            "breakdown": delivery_breakdown
+        }
+    })
+
+
+########3gender analytics 
+
+
+
+def count_gender_live_vs_dead(request):
+    """
+    Returns combined (Project1 + Project2) comparison of gender availability
+    for:
+      - Live births (Live Born Well/Sick)
+      - Dead babies (status contains 'Dead')
+    Supports ?dag=<dag_name>
+    """
+
+    try:
+        dag = request.GET.get("dag", None)
+        dag_filter = None if not dag or dag.lower() == "all" else dag.strip().lower()
+
+        # ✅ Common field definitions
+        live_statuses = ["Live Born (Well)", "Live Born (Sick)"]
+        dead_status_fields = [
+            "d29_baby_current_status_b1",
+            "d29_baby_current_status_b2",
+            "d29_baby_current_status_b3",
+        ]
+        live_status_fields = ["baby1_status", "baby2_status", "baby3_status"]
+        gender_fields = ["baby1_sex", "baby2_sex", "baby3_sex"]
+
+        def process_livebirths(model, dag_filter=None):
+            qs = model.objects.all()
+            if dag_filter:
+                qs = qs.filter(data_access_group__iexact=dag_filter)
+
+            total_live = 0
+            gender_available = 0
+            gender_missing = 0
+
+            breakdown = {
+                "Male": 0,
+                "Female": 0,
+                "Ambiguous": 0,
+                "Unknown": 0
+            }
+
+            for rec in qs:
+                for i in range(3):
+                    status = getattr(rec, live_status_fields[i], None)
+                    if status in live_statuses:
+                        total_live += 1
+                        gender = getattr(rec, gender_fields[i], None)
+                        if gender and gender.strip():
+                            gender_available += 1
+                            g = gender.strip().title()
+                            if g in breakdown:
+                                breakdown[g] += 1
+                            else:
+                                breakdown["Unknown"] += 1
+                        else:
+                            gender_missing += 1
+
+            return total_live, gender_available, gender_missing, breakdown
+
+        def process_deaths(model, dag_filter=None):
+            q = Q()
+            for f in dead_status_fields:
+                q |= Q(**{f"{f}__icontains": "Dead"})
+            qs = model.objects.filter(q)
+            if dag_filter:
+                qs = qs.filter(data_access_group__iexact=dag_filter)
+
+            total_dead = 0
+            gender_available = 0
+            gender_missing = 0
+
+            breakdown = {
+                "Male": 0,
+                "Female": 0,
+                "Ambiguous": 0,
+                "Unknown": 0
+            }
+
+            for rec in qs:
+                for i in range(3):
+                    status = getattr(rec, dead_status_fields[i], None)
+                    if status and "dead" in status.lower():
+                        total_dead += 1
+                        gender = getattr(rec, gender_fields[i], None)
+                        if gender and gender.strip():
+                            gender_available += 1
+                            g = gender.strip().title()
+                            if g in breakdown:
+                                breakdown[g] += 1
+                            else:
+                                breakdown["Unknown"] += 1
+                        else:
+                            gender_missing += 1
+
+            return total_dead, gender_available, gender_missing, breakdown
+
+        # ---- Process both projects ----
+        # Live births
+        p1_live_total, p1_live_avail, p1_live_missing, p1_live_break = process_livebirths(Project1Record, dag_filter)
+        p2_live_total, p2_live_avail, p2_live_missing, p2_live_break = process_livebirths(Project2Record, dag_filter)
+
+        # Dead babies
+        p1_dead_total, p1_dead_avail, p1_dead_missing, p1_dead_break = process_deaths(Project1Record, dag_filter)
+        p2_dead_total, p2_dead_avail, p2_dead_missing, p2_dead_break = process_deaths(Project2Record, dag_filter)
+
+        # ---- Combine both ----
+        live_total = p1_live_total + p2_live_total
+        live_avail = p1_live_avail + p2_live_avail
+        live_missing = p1_live_missing + p2_live_missing
+
+        dead_total = p1_dead_total + p2_dead_total
+        dead_avail = p1_dead_avail + p2_dead_avail
+        dead_missing = p1_dead_missing + p2_dead_missing
+
+        live_breakdown = {
+            key: p1_live_break.get(key, 0) + p2_live_break.get(key, 0)
+            for key in set(p1_live_break) | set(p2_live_break)
+        }
+        dead_breakdown = {
+            key: p1_dead_break.get(key, 0) + p2_dead_break.get(key, 0)
+            for key in set(p1_dead_break) | set(p2_dead_break)
+        }
+
+        # Percentages
+        live_pct = round((live_avail / live_total) * 100, 1) if live_total else 0
+        dead_pct = round((dead_avail / dead_total) * 100, 1) if dead_total else 0
+
+        # Distinct DAGs
+        dags = (
+            list(
+                Project1Record.objects.exclude(data_access_group__isnull=True)
+                .exclude(data_access_group__exact="")
+                .values_list("data_access_group", flat=True)
+                .distinct()
+            )
+            + list(
+                Project2Record.objects.exclude(data_access_group__isnull=True)
+                .exclude(data_access_group__exact="")
+                .values_list("data_access_group", flat=True)
+                .distinct()
+            )
+        )
+        dags = sorted(set(dags))
+
+        # ---- Final JSON Response ----
+        return JsonResponse({
+            "selected_dag": dag if dag else "Overall",
+            "available_dags": dags,
+            "live_births": {
+                "total": live_total,
+                "available": live_avail,
+                "missing": live_missing,
+                "percent_available": live_pct,
+                "breakdown": live_breakdown
+            },
+            "dead_babies": {
+                "total": dead_total,
+                "available": dead_avail,
+                "missing": dead_missing,
+                "percent_available": dead_pct,
+                "breakdown": dead_breakdown
+            }
+        })
+
+    except Exception:
+        print("❌ Error in count_gender_live_vs_dead:", traceback.format_exc())
+        return JsonResponse({"error": "Internal Server Error"}, status=500)
+
+
+
+############birthweight##########
+
+
+
+def count_birthweight_live_vs_dead(request):
+    """
+    Returns combined (Project1 + Project2) comparison of birthweight categories:
+      - All deliveries (Live + Still Born)
+      - Dead babies only
+    Categories: <1000, 1000–1499, 1500–2499, ≥2500
+    Supports ?dag=<dag_name>
+    """
+
+    dag = request.GET.get("dag", None)
+    exclude_dag_filter = Q(data_access_group__isnull=True) | Q(data_access_group__exact="")
+
+    birthweight_fields = ["baby1_birthweight", "baby2_birthweight", "baby3_birthweight"]
+    status_fields_live = ["baby1_status", "baby2_status", "baby3_status"]
+    status_fields_dead = [
+        "d29_baby_current_status_b1",
+        "d29_baby_current_status_b2",
+        "d29_baby_current_status_b3",
+    ]
+
+    live_statuses = ['Live Born (Well)', 'Live Born (Sick)']
+    still_status = 'Still Born / IUD'
+
+    # Helper: Apply DAG filter
+    def get_queryset(model):
+        qs = model.objects.exclude(exclude_dag_filter)
+        if dag and dag.lower() != "all":
+            qs = qs.filter(data_access_group__iexact=dag)
+        return qs
+
+    # 🧮 For All Deliveries (Live + Still)
+    def count_all_birthweights(model):
+        qs = get_queryset(model)
+        total = available = missing = 0
+        categories = {"<1000": 0, "1000-1499": 0, "1500-2499": 0, "≥2500": 0}
+
+        for record in qs.values(*status_fields_live, *birthweight_fields):
+            for i in range(1, 4):
+                status = record.get(f"baby{i}_status")
+                bw = record.get(f"baby{i}_birthweight")
+                if status in live_statuses + [still_status]:
+                    total += 1
+                    if bw and str(bw).strip() != "":
+                        try:
+                            bw_val = float(bw)
+                            available += 1
+                            if bw_val < 1000:
+                                categories["<1000"] += 1
+                            elif 1000 <= bw_val < 1500:
+                                categories["1000-1499"] += 1
+                            elif 1500 <= bw_val < 2500:
+                                categories["1500-2499"] += 1
+                            else:
+                                categories["≥2500"] += 1
+                        except ValueError:
+                            missing += 1
+                    else:
+                        missing += 1
+        return available, missing, total, categories
+
+    # 🧮 For Dead Babies Only
+    def count_dead_birthweights(model):
+        qs = get_queryset(model)
+        total_dead = 0
+        available = 0
+        categories = {"<1000": 0, "1000-1499": 0, "1500-2499": 0, "≥2500": 0}
+
+        for record in qs.values(*status_fields_dead, *birthweight_fields):
+            for i in range(1, 4):
+                status = str(record.get(f"d29_baby_current_status_b{i}") or "").strip()
+                bw = record.get(f"baby{i}_birthweight")
+                if "dead" in status.lower():
+                    total_dead += 1
+                    if bw and str(bw).strip() != "":
+                        try:
+                            bw_val = float(bw)
+                            available += 1
+                            if bw_val < 1000:
+                                categories["<1000"] += 1
+                            elif 1000 <= bw_val < 1500:
+                                categories["1000-1499"] += 1
+                            elif 1500 <= bw_val < 2500:
+                                categories["1500-2499"] += 1
+                            else:
+                                categories["≥2500"] += 1
+                        except ValueError:
+                            pass
+        return total_dead, available, categories
+
+    # 🔹 Combine both projects
+    # All births
+    p1_avail_all, p1_missing_all, p1_total_all, p1_cats_all = count_all_birthweights(Project1Record)
+    p2_avail_all, p2_missing_all, p2_total_all, p2_cats_all = count_all_birthweights(Project2Record)
+
+    # Dead babies
+    p1_dead_total, p1_dead_avail, p1_cats_dead = count_dead_birthweights(Project1Record)
+    p2_dead_total, p2_dead_avail, p2_cats_dead = count_dead_birthweights(Project2Record)
+
+    # Combine both
+    total_available_all = p1_avail_all + p2_avail_all
+    total_missing_all = p1_missing_all + p2_missing_all
+    total_deliveries_all = p1_total_all + p2_total_all
+
+    total_dead = p1_dead_total + p2_dead_total
+    total_dead_available = p1_dead_avail + p2_dead_avail
+
+    combined_all = {
+        key: p1_cats_all.get(key, 0) + p2_cats_all.get(key, 0)
+        for key in set(p1_cats_all) | set(p2_cats_all)
+    }
+    combined_dead = {
+        key: p1_cats_dead.get(key, 0) + p2_cats_dead.get(key, 0)
+        for key in set(p1_cats_dead) | set(p2_cats_dead)
+    }
+
+    percent_all_available = round((total_available_all / total_deliveries_all * 100), 2) if total_deliveries_all else 0
+    percent_dead_available = round((total_dead_available / total_dead * 100), 2) if total_dead else 0
+
+    return JsonResponse({
+        "selected_dag": dag or "All",
+        "birthweight_all": {
+            "total": total_deliveries_all,
+            "available": total_available_all,
+            "missing": total_missing_all,
+            "percent_available": percent_all_available,
+            "categories": combined_all
+        },
+        "birthweight_dead": {
+            "total_dead": total_dead,
+            "available_birthweight": total_dead_available,
+            "percent_available": percent_dead_available,
+            "categories": combined_dead
+        }
+    })
 
